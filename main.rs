@@ -1,6 +1,7 @@
-use image::{DynamicImage, GenericImageView, ImageOutputFormat};
+use image::{DynamicImage, ImageOutputFormat};
 use serde::Deserialize;
 use std::convert::Infallible;
+use std::fs;
 use std::fs::File;
 use std::io::Cursor;
 use tokio::signal;
@@ -13,9 +14,11 @@ async fn main() {
     println!("Server started!");
 
     // Route: /thumbnail/{image_path}?width=100&height=100
-    let thumbnail_route = warp::path!("thumbnail" / String)
+    let thumbnail_route = warp::path("thumbnail")
+        .and(warp::path::tail())
         .and(warp::query::<ThumbnailParams>())
-        .and_then(handle_thumbnail);
+        .and_then(handle_thumbnail)
+        .with(warp::log("thumbs::requests")); // Add logging
 
     // Create a future that listens for the termination signal.
     let shutdown_signal = async {
@@ -40,9 +43,12 @@ struct ThumbnailParams {
 }
 
 async fn handle_thumbnail(
-    image_path: String,
+    tail: warp::path::Tail,
     params: ThumbnailParams,
 ) -> Result<impl warp::Reply, Infallible> {
+    println!("thumbnailing!");
+    let image_path = tail.as_str().to_string();
+    println!("image_path: {:?}, params: {:?}", image_path, params);
     match create_thumbnail(&image_path, params.width, params.height) {
         Ok(buffer) => {
             let response = Response::builder()
@@ -67,6 +73,13 @@ fn create_thumbnail(
     width: u32,
     height: u32,
 ) -> Result<warp::hyper::body::Bytes, std::io::Error> {
+    // Check if the image file exists and is accessible.
+    if !fs::metadata(image_path).is_ok() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Image file not found",
+        ));
+    }
     // Open and load the image from the file path.
     let img = image::open(&image_path).expect("Failed to open image file");
 
