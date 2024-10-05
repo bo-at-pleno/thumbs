@@ -20,11 +20,16 @@ struct Args {
     /// Port to bind the server to
     #[arg(long, default_value_t = 3030)]
     port: u16,
+
+    /// Size of the in-memory cache
+    #[arg(short, long, default_value_t = 100)]
+    cache_size: usize,
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
+    img::initialize_cache(args.cache_size);
     let addr: SocketAddr = format!("{}:{}", args.host, args.port)
         .parse()
         .expect("Invalid address");
@@ -56,9 +61,8 @@ async fn handle_thumbnail(
     tail: warp::path::Tail,
     params: ThumbnailParams,
 ) -> Result<impl warp::Reply, Infallible> {
-    println!("thumbnailing!");
     let image_path = tail.as_str().to_string();
-    println!("image_path: {:?}, params: {:?}", image_path, params);
+    println!("Serving image_path: {:?}, params: {:?}", image_path, params);
     match create_thumbnail(&image_path, params.width, params.height) {
         Ok(buffer) => {
             let response = Response::builder()

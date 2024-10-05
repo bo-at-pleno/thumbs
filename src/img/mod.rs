@@ -1,7 +1,11 @@
+use blake3::Hasher;
 use image::ImageOutputFormat;
+use lazy_static::lazy_static;
+use lru::LruCache;
 use serde::Deserialize;
-use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
+use std::num::NonZero;
+use std::sync::Mutex;
 use warp::hyper::body::Bytes;
 
 #[derive(Debug, Deserialize)]
@@ -10,13 +14,42 @@ pub struct ThumbnailParams {
     pub height: u32,
 }
 
+lazy_static! {
+    static ref CACHE: Mutex<LruCache<String, Bytes>> =
+        Mutex::new(LruCache::new(NonZero::new(100).unwrap()));
+}
+
+pub fn initialize_cache(size: usize) {
+    let non_zero_size = std::num::NonZeroUsize::new(size).unwrap();
+    let mut cache = CACHE.lock().unwrap();
+    *cache = LruCache::new(non_zero_size);
+}
+
+fn generate_cache_key(image_path: &str, width: u32, height: u32) -> String {
+    let mut hasher = Hasher::new();
+    hasher.update(image_path.as_bytes());
+    hasher.update(&width.to_le_bytes());
+    hasher.update(&height.to_le_bytes());
+    let hash = hasher.finalize();
+    hash.to_hex().to_string()
+}
+
 pub fn create_thumbnail(
     image_path: &str,
     width: u32,
     height: u32,
 ) -> Result<Bytes, std::io::Error> {
+    let cache_key = generate_cache_key(image_path, width, height);
+    println!("Cache key: {}", cache_key);
+
+    // Check if the thumbnail is already cached in memory
+    if let Some(cached_thumbnail) = CACHE.lock().unwrap().get(&cache_key) {
+        println!("Thumbnail found in cache: {}", cache_key);
+        return Ok(cached_thumbnail.clone());
+    }
+
     // Check if the image file exists and is accessible.
-    if !fs::metadata(image_path).is_ok() {
+    if !std::fs::metadata(image_path).is_ok() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "Image file not found",
@@ -45,6 +78,10 @@ pub fn create_thumbnail(
             )
         })?;
 
-    // Convert the buffer to a warp-compatible response.
-    Ok(Bytes::from(buffer.into_inner()))
+    let bytes = Bytes::from(buffer.into_inner());
+
+    // Save the thumbnail to the in-memory cache
+    CACHE.lock().unwrap().put(cache_key.clone(), bytes.clone());
+
+    Ok(bytes)
 }
