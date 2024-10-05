@@ -8,6 +8,9 @@ use clap::Parser;
 use std::net::SocketAddr;
 mod img;
 use img::{create_thumbnail, ThumbnailParams};
+use log::{error, info, warn};
+
+use env_logger;
 
 /// Simple thumbnail server that generates a thumbnail from an image file.
 #[derive(Parser, Debug)]
@@ -28,12 +31,13 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     let args = Args::parse();
     img::initialize_cache(args.cache_size);
     let addr: SocketAddr = format!("{}:{}", args.host, args.port)
         .parse()
         .expect("Invalid address");
-    println!("Server started at {}", addr);
+    info!("Server started at {}", addr);
 
     // Route: /thumbnail/{image_path}?width=100&height=100
     let thumbnail_route = warp::path("thumbnail")
@@ -45,7 +49,7 @@ async fn main() {
     // Create a future that listens for the termination signal.
     let shutdown_signal = async {
         signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
-        println!("Received Ctrl+C, shutting down...");
+        warn!("Received Ctrl+C, shutting down...");
     };
 
     // Start the server and wait for either the server to complete or the shutdown signal.
@@ -54,7 +58,7 @@ async fn main() {
         _ = shutdown_signal => {},
     }
 
-    println!("Bye!");
+    info!("Bye!");
 }
 
 async fn handle_thumbnail(
@@ -62,7 +66,7 @@ async fn handle_thumbnail(
     params: ThumbnailParams,
 ) -> Result<impl warp::Reply, Infallible> {
     let image_path = tail.as_str().to_string();
-    println!("Serving image_path: {:?}, params: {:?}", image_path, params);
+    info!("Serving image_path: {:?}, params: {:?}", image_path, params);
     match create_thumbnail(&image_path, params.width, params.height) {
         Ok(buffer) => {
             let response = Response::builder()

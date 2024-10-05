@@ -1,6 +1,7 @@
 use blake3::Hasher;
 use image::ImageOutputFormat;
 use lazy_static::lazy_static;
+use log::info;
 use lru::LruCache;
 use serde::Deserialize;
 use std::io::{Cursor, Read};
@@ -40,11 +41,11 @@ pub fn create_thumbnail(
     height: u32,
 ) -> Result<Bytes, std::io::Error> {
     let cache_key = generate_cache_key(image_path, width, height);
-    println!("Cache key: {}", cache_key);
+    info!("Cache key: {}", cache_key);
 
     // Check if the thumbnail is already cached in memory
     if let Some(cached_thumbnail) = CACHE.lock().unwrap().get(&cache_key) {
-        println!("Thumbnail found in cache: {}", cache_key);
+        info!("Thumbnail found in cache: {}", cache_key);
         return Ok(cached_thumbnail.clone());
     }
 
