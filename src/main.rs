@@ -1,8 +1,4 @@
-use image::{DynamicImage, ImageOutputFormat};
 use std::convert::Infallible;
-use std::fs;
-use std::fs::File;
-use std::io::Cursor;
 use tokio::signal;
 use warp::http::Response;
 use warp::hyper::Body;

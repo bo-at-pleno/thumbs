@@ -1,4 +1,4 @@
-use image::{DynamicImage, ImageOutputFormat};
+use image::ImageOutputFormat;
 use serde::Deserialize;
 use std::fs;
 use std::io::Cursor;
