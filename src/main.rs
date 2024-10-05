@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 use tokio::signal;
+use tokio::task;
 use warp::http::Response;
 use warp::hyper::Body;
 use warp::Filter;
@@ -67,15 +68,20 @@ async fn handle_thumbnail(
 ) -> Result<impl warp::Reply, Infallible> {
     let image_path = tail.as_str().to_string();
     info!("Serving image_path: {:?}, params: {:?}", image_path, params);
-    match create_thumbnail(&image_path, params.width, params.height) {
-        Ok(buffer) => {
+
+    let result =
+        task::spawn_blocking(move || create_thumbnail(&image_path, params.width, params.height))
+            .await;
+
+    match result {
+        Ok(Ok(buffer)) => {
             let response = Response::builder()
                 .header("Content-Type", "image/png")
                 .body(Body::from(buffer))
                 .unwrap();
             Ok(response)
         }
-        Err(_) => {
+        Ok(Err(_)) | Err(_) => {
             let response = Response::builder()
                 .status(warp::http::StatusCode::INTERNAL_SERVER_ERROR)
                 .body(Body::from("Failed to generate thumbnail".to_string()))
