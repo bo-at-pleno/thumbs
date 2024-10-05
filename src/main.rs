@@ -1,3 +1,4 @@
+use simplelog::{Config, LevelFilter, SimpleLogger};
 use std::convert::Infallible;
 use tokio::signal;
 use tokio::task;
@@ -10,8 +11,6 @@ use std::net::SocketAddr;
 mod img;
 use img::{create_thumbnail, ThumbnailParams};
 use log::{error, info, warn};
-
-use env_logger;
 
 /// Simple thumbnail server that generates a thumbnail from an image file.
 #[derive(Parser, Debug)]
@@ -32,12 +31,18 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
     let args = Args::parse();
     img::initialize_cache(args.cache_size);
+
     let addr: SocketAddr = format!("{}:{}", args.host, args.port)
         .parse()
-        .expect("Invalid address");
+        .map_err(|e| {
+            error!("Failed to parse address: {}", e);
+            std::process::exit(1);
+        })
+        .unwrap();
+
     info!("Server started at {}", addr);
 
     // Route: /thumbnail/{image_path}?width=100&height=100
