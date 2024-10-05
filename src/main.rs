@@ -4,12 +4,31 @@ use warp::http::Response;
 use warp::hyper::Body;
 use warp::Filter;
 
+use clap::Parser;
+use std::net::SocketAddr;
 mod img;
 use img::{create_thumbnail, ThumbnailParams};
 
+/// Simple thumbnail server that generates a thumbnail from an image file.
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Host to bind the server to
+    #[arg(long, default_value = "127.0.0.1")]
+    host: String,
+
+    /// Port to bind the server to
+    #[arg(long, default_value_t = 3030)]
+    port: u16,
+}
+
 #[tokio::main]
 async fn main() {
-    println!("Server started!");
+    let args = Args::parse();
+    let addr: SocketAddr = format!("{}:{}", args.host, args.port)
+        .parse()
+        .expect("Invalid address");
+    println!("Server started at {}", addr);
 
     // Route: /thumbnail/{image_path}?width=100&height=100
     let thumbnail_route = warp::path("thumbnail")
@@ -26,7 +45,7 @@ async fn main() {
 
     // Start the server and wait for either the server to complete or the shutdown signal.
     tokio::select! {
-        _ = warp::serve(thumbnail_route).run(([127, 0, 0, 1], 3030)) => {},
+        _ = warp::serve(thumbnail_route).run(addr) => {},
         _ = shutdown_signal => {},
     }
 

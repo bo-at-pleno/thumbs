@@ -24,7 +24,7 @@ pub fn create_thumbnail(
     }
 
     // Open and load the image from the file path.
-    let img = image::open(&image_path).map_err(|e| {
+    let img = image::open(image_path).map_err(|e| {
         std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to open image file: {}", e),
