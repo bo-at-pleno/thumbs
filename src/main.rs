@@ -74,9 +74,7 @@ async fn handle_thumbnail(
     let image_path = tail.as_str().to_string();
     info!("Serving image_path: {:?}, params: {:?}", image_path, params);
 
-    let result =
-        task::spawn_blocking(move || create_thumbnail(&image_path, params.width, params.height))
-            .await;
+    let result = task::spawn_blocking(move || create_thumbnail(&image_path, params)).await;
 
     match result {
         Ok(Ok(buffer)) => {

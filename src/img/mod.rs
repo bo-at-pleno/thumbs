@@ -13,6 +13,9 @@ use warp::hyper::body::Bytes;
 pub struct ThumbnailParams {
     pub width: u32,
     pub height: u32,
+    pub min: Option<u8>,
+    pub max: Option<u8>,
+    pub autocontrast: Option<bool>,
 }
 
 lazy_static! {
@@ -26,21 +29,29 @@ pub fn initialize_cache(size: usize) {
     *cache = LruCache::new(non_zero_size);
 }
 
-fn generate_cache_key(image_path: &str, width: u32, height: u32) -> String {
+fn generate_cache_key(image_path: &str, params: &ThumbnailParams) -> String {
     let mut hasher = Hasher::new();
     hasher.update(image_path.as_bytes());
-    hasher.update(&width.to_le_bytes());
-    hasher.update(&height.to_le_bytes());
+    hasher.update(&params.width.to_le_bytes());
+    hasher.update(&params.height.to_le_bytes());
+    if let Some(min) = params.min {
+        hasher.update(&[min]);
+    }
+    if let Some(max) = params.max {
+        hasher.update(&[max]);
+    }
+    if let Some(autocontrast) = params.autocontrast {
+        hasher.update(&[autocontrast as u8]);
+    }
     let hash = hasher.finalize();
     hash.to_hex().to_string()
 }
 
 pub fn create_thumbnail(
     image_path: &str,
-    width: u32,
-    height: u32,
+    params: ThumbnailParams,
 ) -> Result<Bytes, std::io::Error> {
-    let cache_key = generate_cache_key(image_path, width, height);
+    let cache_key = generate_cache_key(image_path, &params);
     info!("Cache key: {}", cache_key);
 
     // Check if the thumbnail is already cached in memory
@@ -66,7 +77,7 @@ pub fn create_thumbnail(
     })?;
 
     // Resize the image to the given dimensions.
-    let thumbnail = img.thumbnail(width, height);
+    let thumbnail = img.thumbnail(params.width, params.height);
 
     // Encode the resized image to PNG format.
     let mut buffer = Cursor::new(Vec::new());
