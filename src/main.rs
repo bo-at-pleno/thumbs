@@ -7,7 +7,6 @@ use warp::Filter;
 
 mod img;
 mod routes;
-use routes::thumbnail_route;
 
 /// Simple thumbnail server that generates a thumbnail from an image file.
 #[derive(Parser, Debug)]
@@ -50,7 +49,7 @@ async fn main() {
     info!("Server started at {}", addr);
 
     // Use the thumbnail_route from the routes module
-    let routes = thumbnail_route();
+    let routes = routes::thumbnail_route().or(routes::preview_route());
 
     // Create a future that listens for the termination signal.
     let shutdown_signal = async {

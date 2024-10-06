@@ -15,6 +15,14 @@ pub fn thumbnail_route() -> impl Filter<Extract = impl Reply, Error = Rejection>
         .with(warp::log("thumbs::requests"))
 }
 
+pub fn preview_route() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::path("preview")
+        .and(warp::path::tail())
+        .and(warp::query::<ThumbnailParams>())
+        .and_then(handle_preview)
+        .with(warp::log("thumbs::requests"))
+}
+
 async fn handle_thumbnail(
     tail: warp::path::Tail,
     params: ThumbnailParams,
@@ -40,4 +48,23 @@ async fn handle_thumbnail(
             Ok(response)
         }
     }
+}
+
+async fn handle_preview(
+    tail: warp::path::Tail,
+    params: ThumbnailParams,
+) -> Result<impl warp::Reply, Infallible> {
+    let image_path = tail.as_str().to_string();
+    info!(
+        "Serving preview for image_path: {:?}, params: {:?}",
+        image_path, params
+    );
+
+    // Implement the logic for generating a preview here
+    // For now, we'll just return a placeholder response
+    let response = Response::builder()
+        .header("Content-Type", "text/plain")
+        .body(Body::from("Preview not implemented".to_string()))
+        .unwrap();
+    Ok(response)
 }
