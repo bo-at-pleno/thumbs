@@ -1,16 +1,13 @@
-use simplelog::{Config, LevelFilter, SimpleLogger};
-use std::convert::Infallible;
+use clap::Parser;
+use log::{error, info, warn};
+use simplelog::{ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode};
+use std::net::SocketAddr;
 use tokio::signal;
-use tokio::task;
-use warp::http::Response;
-use warp::hyper::Body;
 use warp::Filter;
 
-use clap::Parser;
-use std::net::SocketAddr;
 mod img;
-use img::{create_thumbnail, ThumbnailParams};
-use log::{error, info, warn};
+mod routes;
+use routes::thumbnail_route;
 
 /// Simple thumbnail server that generates a thumbnail from an image file.
 #[derive(Parser, Debug)]
@@ -31,7 +28,14 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
-    SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
+    CombinedLogger::init(vec![TermLogger::new(
+        LevelFilter::Info,
+        Config::default(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )])
+    .unwrap();
+
     let args = Args::parse();
     img::initialize_cache(args.cache_size);
 
@@ -45,12 +49,8 @@ async fn main() {
 
     info!("Server started at {}", addr);
 
-    // Route: /thumbnail/{image_path}?width=100&height=100
-    let thumbnail_route = warp::path("thumbnail")
-        .and(warp::path::tail())
-        .and(warp::query::<ThumbnailParams>())
-        .and_then(handle_thumbnail)
-        .with(warp::log("thumbs::requests")); // Add logging
+    // Use the thumbnail_route from the routes module
+    let routes = thumbnail_route();
 
     // Create a future that listens for the termination signal.
     let shutdown_signal = async {
@@ -60,36 +60,9 @@ async fn main() {
 
     // Start the server and wait for either the server to complete or the shutdown signal.
     tokio::select! {
-        _ = warp::serve(thumbnail_route).run(addr) => {},
+        _ = warp::serve(routes).run(addr) => {},
         _ = shutdown_signal => {},
     }
 
     info!("Bye!");
-}
-
-async fn handle_thumbnail(
-    tail: warp::path::Tail,
-    params: ThumbnailParams,
-) -> Result<impl warp::Reply, Infallible> {
-    let image_path = tail.as_str().to_string();
-    info!("Serving image_path: {:?}, params: {:?}", image_path, params);
-
-    let result = task::spawn_blocking(move || create_thumbnail(&image_path, params)).await;
-
-    match result {
-        Ok(Ok(buffer)) => {
-            let response = Response::builder()
-                .header("Content-Type", "image/png")
-                .body(Body::from(buffer))
-                .unwrap();
-            Ok(response)
-        }
-        Ok(Err(_)) | Err(_) => {
-            let response = Response::builder()
-                .status(warp::http::StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from("Failed to generate thumbnail".to_string()))
-                .unwrap();
-            Ok(response)
-        }
-    }
 }
