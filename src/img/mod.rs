@@ -61,7 +61,7 @@ pub fn create_thumbnail(
     }
 
     // Check if the image file exists and is accessible.
-    if !std::fs::metadata(image_path).is_ok() {
+    if std::fs::metadata(image_path).is_err() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "Image file not found",
