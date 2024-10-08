@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::info;
 use std::convert::Infallible;
 use tokio::task;
 use warp::http::{Response, StatusCode};

@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 use log::info;
 use lru::LruCache;
 use serde::Deserialize;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::num::NonZero;
 use std::sync::Mutex;
 use warp::hyper::body::Bytes;
